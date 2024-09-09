@@ -1,10 +1,13 @@
 import unittest
-
+from htmlnode import HTMLNode, ParentNode, LeafNode, text_node_to_html_node
 from textnode import TextNode
-from new_function_textnode import split_nodes_delimiter, extract_markdown_images, extract_markdown_links, split_nodes_image, split_nodes_link, text_to_textnodes
+from new_function_textnode import (
+    split_nodes_delimiter, extract_markdown_images, extract_markdown_links,
+    split_nodes_image, split_nodes_link, text_to_textnodes, markdown_to_blocks,
+    block_to_block_type, text_to_textnodes, markdown_to_blocks, block_to_block_type, text_to_children, markdown_to_html_node
+)
 
 #Testcase for TextNode
-
 class TestTextNode(unittest.TestCase):
     def test_eq_same_properties(self):
         node = TextNode("This is a text node", "bold")
@@ -273,7 +276,10 @@ class TestTextNodeFunctions(unittest.TestCase):
         self.assertEqual(result, expected_nodes)
 
     def test_combined(self):
-        text = "Here is **bold** text, *italic*, `code`, an ![image](https://example.com/image.png), and a [link](https://example.com)."
+        text = (
+            "Here is **bold** text, *italic*, `code`, an ![image](https://example.com/image.png), "
+            "and a [link](https://example.com)."
+        )
         expected_nodes = [
             TextNode("Here is ", "text"),
             TextNode("bold", "bold"),
@@ -289,6 +295,7 @@ class TestTextNodeFunctions(unittest.TestCase):
         ]
         result = text_to_textnodes(text)
         self.assertEqual(result, expected_nodes)
+
 
     def test_unmatched_delimiter(self):
         text = "This is **bold text without closing delimiter"
@@ -313,6 +320,304 @@ class TestTextNodeFunctions(unittest.TestCase):
         result = text_to_textnodes(text)
         self.assertEqual(result, expected_nodes)
 
+#testcases for markdownBlock
+class TestMarkdownToBlocks(unittest.TestCase):
+
+    def test_basic_split(self):
+        markdown = """# Heading
+
+                    Paragraph text.
+
+                * List item 1
+                * List item 2
+                """
+        expected_blocks = [
+            "# Heading",
+            "Paragraph text.",
+            "* List item 1\n* List item 2"
+        ]
+        result = markdown_to_blocks(markdown)
+        self.assertEqual(result, expected_blocks)
+
+    def test_empty_lines(self):
+        markdown = """# Heading
+
+
+                    Paragraph text.
+
+
+                    * List item 1
+
+
+                    * List item 2
+
+
+                    """
+        expected_blocks = [
+            "# Heading",
+            "Paragraph text.",
+            "* List item 1",
+            "* List item 2"
+        ]
+        result = markdown_to_blocks(markdown)
+        self.assertEqual(result, expected_blocks)
+
+    def test_no_blocks(self):
+        markdown = ""
+        expected_blocks = []
+        result = markdown_to_blocks(markdown)
+        self.assertEqual(result, expected_blocks)
+
+    def test_single_block(self):
+        markdown = "This is a single block with no extra lines."
+        expected_blocks = [
+            "This is a single block with no extra lines."
+        ]
+        result = markdown_to_blocks(markdown)
+        self.assertEqual(result, expected_blocks)
+
+    def test_multiple_newlines(self):
+        markdown = """Block 1
+
+
+                    Block 2
+
+
+                    Block 3
+
+
+                    """
+        expected_blocks = [
+            "Block 1",
+            "Block 2",
+            "Block 3"
+        ]
+        result = markdown_to_blocks(markdown)
+        self.assertEqual(result, expected_blocks)
+
+    def test_leading_trailing_whitespace(self):
+        markdown = """  # Heading
+
+                    Paragraph text.  
+
+                    * List item 1
+                    * List item 2
+                    
+                    """
+        expected_blocks = [
+            "# Heading",
+            "Paragraph text.",
+            "* List item 1\n* List item 2"
+        ]
+        result = markdown_to_blocks(markdown)
+        self.assertEqual(result, expected_blocks)
+
+    def test_consecutive_blocks_with_no_space(self):
+        markdown = """Block 1\nBlock 2\n\nBlock 3\n\nBlock 4"""
+        expected_blocks = [
+            "Block 1\nBlock 2",
+            "Block 3",
+            "Block 4"
+        ]
+        result = markdown_to_blocks(markdown)
+        self.assertEqual(result, expected_blocks)
+
+    def test_blocks_with_only_newlines(self):
+        markdown = """
+
+
+                    """
+        expected_blocks = []
+        result = markdown_to_blocks(markdown)
+        self.assertEqual(result, expected_blocks)
+
+    def test_single_blank_line_between_blocks(self):
+        markdown = """Block 1
+
+                    Block 2
+
+                    Block 3"""
+        expected_blocks = [
+            "Block 1",
+            "Block 2",
+            "Block 3"
+        ]
+        result = markdown_to_blocks(markdown)
+        self.assertEqual(result, expected_blocks)
+
+#testcases for block to block type
+class TestBlockToBlockType(unittest.TestCase):
+    def test_empty_block(self):
+        self.assertEqual(block_to_block_type(""), 'paragraph')
+        self.assertEqual(block_to_block_type("   "), 'paragraph')
+
+    def test_paragraph(self):
+        self.assertEqual(block_to_block_type("This is a simple paragraph."), 'paragraph')
+        self.assertEqual(block_to_block_type("   This is a paragraph with leading spaces.   "), 'paragraph')
+
+    def test_code_block(self):
+        self.assertEqual(block_to_block_type("```code```"), 'code')
+        self.assertEqual(block_to_block_type("```   some code   ```"), 'code')
+        self.assertEqual(block_to_block_type("```\ndef foo():\n    return 'bar'\n```"), 'code')
+
+    def test_heading(self):
+        self.assertEqual(block_to_block_type("# Heading 1"), 'heading')
+        self.assertEqual(block_to_block_type("## Heading 2"), 'heading')
+        self.assertEqual(block_to_block_type("#TitleWithoutSpace"), 'paragraph')  
+        self.assertEqual(block_to_block_type("#"), 'paragraph')  
+
+    def test_quote(self):
+        self.assertEqual(block_to_block_type("> This is a quote."), 'quote')
+        self.assertEqual(block_to_block_type("> Line 1\n> Line 2\n> Line 3"), 'quote')
+        self.assertEqual(block_to_block_type("> Multi-line quote\n> with indentation."), 'quote')
+
+    def test_unordered_list(self):
+        self.assertEqual(block_to_block_type("* Item 1\n* Item 2\n* Item 3"), 'unordered_list')
+        self.assertEqual(block_to_block_type("- Item 1\n- Item 2\n- Item 3"), 'unordered_list')
+        self.assertEqual(block_to_block_type("* Item 1\n- Item 2"), 'unordered_list')
+        self.assertNotEqual(block_to_block_type("* Item 1\n  Item 2"), 'unordered_list') 
+
+    def test_ordered_list(self):
+        self.assertEqual(block_to_block_type("1. Item 1\n2. Item 2\n10. Item 10"), 'ordered_list')
+        self.assertEqual(block_to_block_type("1. Item 1\n2. Item 2\n   3. Item 3"), 'ordered_list')  
+        self.assertNotEqual(block_to_block_type("1. Item 1\nItem 2"), 'ordered_list')  
+
+
+    def test_mixed_blocks(self):
+        # Code block with a mixture of text before and after
+        self.assertNotEqual(block_to_block_type("```This is code\nwith some text``` not code"), 'code')
+        # Unordered list with a non-list item
+        self.assertNotEqual(block_to_block_type("* Item 1\nNot an item"), 'unordered_list')
+        # Quote with text in between
+        self.assertNotEqual(block_to_block_type("> Line 1\nText\n> Line 2"), 'quote')
+
+
+class TestTextToChildren(unittest.TestCase):
+    def test_simple_text(self):
+        text = "Hello, world!"
+        result = text_to_children(text)
+        expected = [LeafNode(tag=None, value="Hello, world!")]
+        self.assertEqual(result, expected)
+
+    def test_bold_text(self):
+        text = "This is **bold** text"
+        result = text_to_children(text)
+        expected = [
+            LeafNode(tag=None, value="This is "),
+            LeafNode(tag="b", value="bold"),
+            LeafNode(tag=None, value=" text")
+        ]
+        self.assertEqual(result, expected)
+
+    def test_italic_text(self):
+        text = "This is *italic* text"
+        result = text_to_children(text)
+        expected = [
+            LeafNode(tag=None, value="This is "),
+            LeafNode(tag="i", value="italic"),
+            LeafNode(tag=None, value=" text")
+        ]
+        self.assertEqual(result, expected)
+
+    def test_code_text(self):
+        text = "This is `code` text"
+        result = text_to_children(text)
+        expected = [
+            LeafNode(tag=None, value="This is "),
+            LeafNode(tag="code", value="code"),
+            LeafNode(tag=None, value=" text")
+        ]
+        self.assertEqual(result, expected)
+
+    def test_image_text(self):
+        text = "This is an image ![alt text](http://example.com/image.jpg)"
+        result = text_to_children(text)
+        expected = [
+            LeafNode(tag=None, value="This is an image "),
+            LeafNode(tag="img", value="", props={"src": "http://example.com/image.jpg", "alt": "alt text"})
+        ]
+        self.assertEqual(result, expected)
+
+    def test_link_text(self):
+        text = "This is a link [example](http://example.com)"
+        result = text_to_children(text)
+        expected = [
+            LeafNode(tag=None, value="This is a link "),
+            LeafNode(tag="a", value="example", props={"href": "http://example.com"})
+        ]
+        self.assertEqual(result, expected)
+
+
+    def test_no_delimiter(self):
+        text = "No delimiters here"
+        result = text_to_children(text)
+        expected = [LeafNode(tag=None, value="No delimiters here")]
+        self.assertEqual(result, expected)
+
+class TestMarkdownToHtmlNode(unittest.TestCase):
+    def test_paragraph(self):
+        markdown = "This is a paragraph."
+        result = markdown_to_html_node(markdown)
+        expected = ParentNode(
+            tag="div",
+            children=[
+                ParentNode(tag="p", children=[
+                    LeafNode(tag=None, value="This is a paragraph.")
+                ])
+            ]
+        )
+        self.assertEqual(result, expected)
+
+    def test_code_block(self):
+        markdown = "```\ncode block\n```"
+        result = markdown_to_html_node(markdown)
+        expected = ParentNode(
+            tag="div",
+            children=[
+                ParentNode(tag="pre", children=[
+                    ParentNode(tag="code", children=[
+                        LeafNode(tag=None, value="code block")
+                    ])
+                ])
+            ]
+        )
+        self.assertEqual(result, expected)
+
+    def test_unordered_list(self):
+        markdown = "* Item 1\n* Item 2"
+        result = markdown_to_html_node(markdown)
+        expected = ParentNode(
+            tag="div",
+            children=[
+                ParentNode(tag="ul", children=[
+                    ParentNode(tag="li", children=[
+                        LeafNode(tag=None, value="Item 1")
+                    ]),
+                    ParentNode(tag="li", children=[
+                        LeafNode(tag=None, value="Item 2")
+                    ])
+                ])
+            ]
+        )
+        self.assertEqual(result, expected)
+
+    def test_ordered_list(self):
+        markdown = "1. Item 1\n2. Item 2"
+        result = markdown_to_html_node(markdown)
+        expected = ParentNode(
+            tag="div",
+            children=[
+                ParentNode(tag="ol", children=[
+                    ParentNode(tag="li", children=[
+                        LeafNode(tag=None, value="Item 1")
+                    ]),
+                    ParentNode(tag="li", children=[
+                        LeafNode(tag=None, value="Item 2")
+                    ])
+                ])
+            ]
+        )
+        self.assertEqual(result, expected)
 
 if __name__ == "__main__":
     unittest.main()

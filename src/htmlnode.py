@@ -16,6 +16,14 @@ class HTMLNode:
             f"HTMLNode(tag={self.tag!r}, value={self.value!r}, "
             f"children={self.children!r}, props={self.props!r})"
         )
+    
+    def __eq__(self, other):
+        if not isinstance(other, HTMLNode):
+            return False
+        return (self.tag == other.tag and
+                self.value == other.value and
+                self.children == other.children and
+                self.props == other.props)
 
 class LeafNode(HTMLNode):
     def __init__(self, value, tag=None, props=None):
@@ -24,12 +32,12 @@ class LeafNode(HTMLNode):
             raise ValueError("The 'value' argument is required for LeafNode.")
     
     def to_html(self):
-        if not self.value and self.tag != "input":
+        if not self.value and self.tag not in ["input", "img"]:
             raise ValueError("LeafNode must have a non-empty value.")
         
         props_html = self.props_to_html()
         
-        if self.tag is None:
+        if self.tag in ["", None]:
             return self.value
         
         # Handle self-closing tags like <input>, <img>
@@ -37,38 +45,39 @@ class LeafNode(HTMLNode):
             return f"<{self.tag}{props_html}>"
         
         return f"<{self.tag}{props_html}>{self.value}</{self.tag}>"
-    
-    def text_node_to_html_node(text_node):
-        text_type_text = "text"
-        text_type_bold = "bold"
-        text_type_italic = "italic"
-        text_type_code = "code"
-        text_type_link = "link"
-        text_type_image = "image"
+ 
+def text_node_to_html_node(text_node):
+    text_type_text = "text"
+    text_type_bold = "bold"
+    text_type_italic = "italic"
+    text_type_code = "code"
+    text_type_link = "link"
+    text_type_image = "image"
 
-        text_type = text_node.text_type
-        value = text_node.value
-        url = text_node.url
+    text_type = text_node.text_type
+    text = text_node.text
+    url = text_node.url
 
-        if text_type == text_type_text:
-            return LeafNode(value=value)
-        elif text_type == text_type_bold:
-            return LeafNode(tag="b", value=value)
-        elif text_type == text_type_italic:
-            return LeafNode(tag="i", value=value)
-        elif text_type == text_type_code:
-            return LeafNode(tag="code", value=value)
-        elif text_type == text_type_link:
-            if not url:
-                raise ValueError("Link TextNode must have a URL.")
-            return LeafNode(tag="a", value=value, props={"href": url})
-        elif text_type == text_type_image:
-            if not url:
-                raise ValueError("Image TextNode must have a URL.")
-            return LeafNode(tag="img", value="", props={"src": url, "alt": value})
-        else:
-            raise ValueError(f"Unsupported text_type: {text_type}")
-    
+    if text_type == "text":
+        return LeafNode(tag=None, value=text)
+    elif text_type == "bold":
+        return LeafNode(tag="b", value=text)
+    elif text_type == "italic":
+        return LeafNode(tag="i", value=text)
+    elif text_type == "code":
+        return LeafNode(tag="code", value=text)
+    elif text_type == "link":
+        if not url:
+            raise ValueError("Link TextNode must have a URL.")
+        return LeafNode(tag="a", value=text, props={"href": url})
+    elif text_type == "image":
+        if not url:
+            raise ValueError("Image TextNode must have a URL.")
+        return LeafNode(tag="img", value="", props={"src": url, "alt": text})
+    else:
+        raise ValueError(f"Unsupported text_type: {text_type}")
+
+
 
 class ParentNode(HTMLNode):
     def __init__(self, tag=None, children=None, props=None):
@@ -90,3 +99,7 @@ class ParentNode(HTMLNode):
         children_html = ''.join(child.to_html() for child in self.children)
         props_html = self.props_to_html()
         return f"<{self.tag}{props_html}>{children_html}</{self.tag}>"
+
+
+
+

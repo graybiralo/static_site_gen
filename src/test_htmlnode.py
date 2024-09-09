@@ -1,6 +1,8 @@
 import unittest
 
 from htmlnode import HTMLNode, LeafNode, ParentNode
+ 
+#testCases for HTMLNode
 
 class TestHTMLNode(unittest.TestCase):
     def test_props_to_html_with_props(self):
@@ -38,6 +40,8 @@ class TestHTMLNode(unittest.TestCase):
         node = HTMLNode(tag="a", value="Link", props={"href": "https://example.com?a=1&b=2"})
         self.assertEqual(node.props_to_html(), ' href="https://example.com?a=1&b=2"')
 
+#testCases for LeafNode
+
 class TestLeafNode(unittest.TestCase):
     def test_to_html_with_tag(self):
         node = LeafNode(value="Hello, World!", tag="p", props={"class": "greeting"})
@@ -71,6 +75,8 @@ class TestLeafNode(unittest.TestCase):
         node = LeafNode(value="Check me", tag="input", props={"type": "checkbox", "checked": ""})
         expected_html = '<input type="checkbox" checked="">'
         self.assertEqual(node.to_html(), expected_html)
+
+#testCases for ParentNode
 
 class TestParentNode(unittest.TestCase):
     def test_to_html_with_tag_and_children(self):
@@ -140,7 +146,6 @@ class TestParentNode(unittest.TestCase):
         wrapper = ParentNode(tag="div", children=[parent], props={"class": "wrapper"})
         expected_html = '<div class="wrapper"><div><section><b>Bold Text</b></section></div></div>'
         self.assertEqual(wrapper.to_html(), expected_html)
-
 
 
 if __name__ == "__main__":
